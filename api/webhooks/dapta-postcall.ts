@@ -26,12 +26,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const analysis = parseMaybeJson(call.call_analysis);
   const custom = parseMaybeJson(analysis.custom_analysis_data);
 
+  const reason = String(call.disconnection_reason ?? '');
   const transferido =
     custom.transfer_completed === true ||
     custom.lead_status === 'transferido' ||
-    call.disconnection_reason === 'call_transfer';
-  const buzon = analysis.in_voicemail === true;
-  const resultado = transferido ? 'transferido' : buzon ? 'buzon' : 'no_contesto';
+    reason === 'call_transfer';
+  const buzon = analysis.in_voicemail === true || reason === 'voicemail_reached';
+  // contestó un humano pero no se llegó a transferir
+  const conectado =
+    !transferido && !buzon &&
+    (reason === 'user_hangup' || reason === 'agent_hangup' || reason === 'inactivity');
+  const resultado = transferido ? 'transferido' : buzon ? 'buzon' : conectado ? 'conectado' : 'no_contesto';
   const callId = call.call_id ?? b.call_id ?? null;
 
   // Precisión: intento_id si el flow ya lo manda; si no, el último 'enviado' del lead
