@@ -15,12 +15,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const digits = String(b.telefono ?? b.phone ?? '').replace(/\D/g, '');
 
+  // Acepta US (10 dígitos, o 11 con 1) y Perú (celular de 9 dígitos que
+  // empieza en 9, o 11 con el 51 delante) — Perú es para testeo.
   let telefono: string | null = null;
-  if (digits.length === 10) telefono = `+1${digits}`;
+  let timezone: string | null = null;
+  if (digits.length === 10 && !digits.startsWith('1')) telefono = `+1${digits}`;
   else if (digits.length === 11 && digits.startsWith('1')) telefono = `+${digits}`;
+  else if (digits.length === 9 && digits.startsWith('9')) {
+    telefono = `+51${digits}`;
+    timezone = 'America/Lima';
+  } else if (digits.length === 11 && digits.startsWith('519')) {
+    telefono = `+${digits}`;
+    timezone = 'America/Lima';
+  }
   if (!telefono) {
     console.warn('[leads] rechazado 400: telefono inválido ->', JSON.stringify(b.telefono ?? b.phone ?? null));
-    return res.status(400).json({ error: 'telefono inválido (se espera número US de 10 dígitos)' });
+    return res.status(400).json({ error: 'telefono inválido (se espera US de 10 dígitos o celular peruano de 9)' });
   }
 
   const { data, error } = await supabase
@@ -29,6 +39,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       nombre: b.nombre ?? b.name ?? null,
       telefono,
       estado_us: b.estado ?? b.estado_us ?? b.state ?? null,
+      timezone, // null para US: el trigger la deriva del estado
       fuente: b.fuente ?? b.source ?? null,
     })
     .select('id, timezone, status')
