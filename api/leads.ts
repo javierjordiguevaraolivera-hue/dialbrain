@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabase } from '../lib/supabase.js';
+import { dispararLlamada, marcarFallo, type FilaDespacho } from '../lib/dapta.js';
 
 // Entrada de leads. Al insertar, el trigger de Supabase genera solo
 // el plan de 15 intentos con la cadencia y la hora ancla del lead.
@@ -56,5 +57,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .eq('lead_id', data.id);
 
   console.log(`[leads] lead creado ${data.id} (${telefono}, tz ${data.timezone}) con ${count ?? 0} intentos programados`);
-  return res.status(201).json({ lead_id: data.id, timezone: data.timezone, intentos_programados: count ?? 0 });
+
+  // Llamada inmediata: el intento 1 vence en el mismo instante del insert,
+  // y se despacha aquí mismo — sin esperar al tick del cron.
+  let llamadaInmediata = false;
+  const { data: filas, error: errDespacho } = await supabase.rpc('despachar_llamadas', {
+    p_limite: 1,
+    p_lead: data.id,
+  });
+  if (errDespacho) {
+    console.error('[leads] error despachando llamada inmediata:', errDespacho.message);
+  } else if (filas?.length) {
+    const f: FilaDespacho = filas[0];
+    try {
+      await dispararLlamada(f);
+      llamadaInmediata = true;
+      console.log(`[leads] llamada inmediata disparada -> ${f.lead_telefono} desde ${f.from_number}`);
+    } catch (e) {
+      console.error('[leads] llamada inmediata FALLÓ:', String(e));
+      await marcarFallo(f.intento_id);
+    }
+  } else {
+    console.warn('[leads] llamada inmediata no despachada (¿sin números disponibles?)');
+  }
+
+  return res.status(201).json({
+    lead_id: data.id,
+    timezone: data.timezone,
+    intentos_programados: count ?? 0,
+    llamada_inmediata: llamadaInmediata,
+  });
 }
