@@ -18,6 +18,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const b = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body ?? {});
+  const bodyStr = JSON.stringify(b);
+  console.log('[postcall] payload recibido:', bodyStr.length > 4000 ? bodyStr.slice(0, 4000) + '…(truncado)' : bodyStr);
   const call = b.call ?? b.data ?? b;
 
   const vars = parseMaybeJson(call.dynamic_variables ?? call.llm_dynamic_variables);
@@ -49,8 +51,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (!intentoId) {
     // 200 igual para que Dapta no reintente; se registra el motivo
+    console.warn('[postcall] sin intento_id ni lead_id en las variables — no se registró resultado');
     return res.status(200).json({ ok: false, motivo: 'sin intento_id ni lead_id en las variables' });
   }
+
+  console.log(`[postcall] intento ${intentoId} -> resultado "${resultado}" (call_id ${callId ?? 'n/a'})`);
 
   const { error } = await supabase.rpc('registrar_resultado', {
     p_intento: intentoId,
