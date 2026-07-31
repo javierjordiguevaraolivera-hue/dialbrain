@@ -1,0 +1,68 @@
+{
+  "info": {
+    "name": "DialBrain — Switch de marcado",
+    "description": "Interruptor maestro del predictive dialer. Prender/apagar el marcado y consultar el estado. La api key y el dominio están en las variables de la colección.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "https://dialbrain.pro" },
+    { "key": "api_key", "value": "dbk_live_1ed65fb0af48e40aa5fe5b91e61d55e96b173b7bc8e9be7b" }
+  ],
+  "item": [
+    {
+      "name": "Obtener status",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "x-api-key", "value": "{{api_key}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/switch",
+          "host": ["{{base_url}}"],
+          "path": ["api", "switch"]
+        },
+        "description": "Devuelve {\"marcando\": true|false, \"updated_at\": ...}"
+      }
+    },
+    {
+      "name": "Prender marcado",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "x-api-key", "value": "{{api_key}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"marcando\": true\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/switch",
+          "host": ["{{base_url}}"],
+          "path": ["api", "switch"]
+        },
+        "description": "Activa el despachador: el cron y las llamadas inmediatas vuelven a marcar."
+      }
+    },
+    {
+      "name": "Apagar marcado",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "x-api-key", "value": "{{api_key}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"marcando\": false\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/switch",
+          "host": ["{{base_url}}"],
+          "path": ["api", "switch"]
+        },
+        "description": "Pausa TODO el marcado (cron + llamadas inmediatas). Los intentos quedan pendientes y se drenan al reactivar."
+      }
+    }
+  ]
+}
