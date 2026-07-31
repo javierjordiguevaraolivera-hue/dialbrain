@@ -24,7 +24,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     filas.map(async (f: any) => {
       const r = await fetch(process.env.DAPTA_WEBHOOK_URL!, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'accept': '*/*',
+          'x-api-key': process.env.DAPTA_FLOW_API_KEY!,
+        },
         body: JSON.stringify({
           lead_id: f.lead_id,
           intento_id: f.intento_id,
