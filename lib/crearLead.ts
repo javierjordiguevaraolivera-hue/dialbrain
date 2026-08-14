@@ -1,17 +1,16 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabase } from '../lib/supabase.js';
-import { dispararLlamada, marcarFallo, type FilaDespacho } from '../lib/dapta.js';
+import { supabase } from './supabase';
+import { dispararLlamada, marcarFallo, type FilaDespacho } from './dapta';
 
-// Entrada de leads. Al insertar, el trigger de Supabase genera solo
-// el plan de 15 intentos con la cadencia y la hora ancla del lead.
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' });
-  if (req.headers['x-api-key'] !== process.env.LEADS_API_KEY) {
-    console.warn('[leads] rechazado 401: x-api-key inválida o ausente');
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+export type ResultadoCrearLead = {
+  code: number;
+  body: Record<string, unknown>;
+};
 
-  const b = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body ?? {});
+// Crea el lead (el trigger de Supabase genera la cadencia) y dispara
+// la llamada inmediata en el mismo request. Compartido por /api/leads
+// (x-api-key) y /api/panel-lead (Basic Auth del panel).
+export async function crearLead(input: Record<string, any>): Promise<ResultadoCrearLead> {
+  const b = input ?? {};
   console.log('[leads] payload recibido:', JSON.stringify(b));
 
   const digits = String(b.telefono ?? b.phone ?? '').replace(/\D/g, '');
@@ -31,7 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (!telefono) {
     console.warn('[leads] rechazado 400: telefono inválido ->', JSON.stringify(b.telefono ?? b.phone ?? null));
-    return res.status(400).json({ error: 'telefono inválido (se espera US de 10 dígitos o celular peruano de 9)' });
+    return { code: 400, body: { error: 'telefono inválido (se espera US de 10 dígitos o celular peruano de 9)' } };
   }
 
   const { data, error } = await supabase
@@ -48,7 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (error) {
     console.error('[leads] error de Supabase:', error.message);
-    return res.status(500).json({ error: error.message });
+    return { code: 500, body: { error: error.message } };
   }
 
   const { count } = await supabase
@@ -78,13 +77,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       await marcarFallo(f.intento_id);
     }
   } else {
-    console.warn('[leads] llamada inmediata no despachada (¿sin números disponibles?)');
+    console.warn('[leads] llamada inmediata no despachada (¿switch apagado o sin números disponibles?)');
   }
 
-  return res.status(201).json({
-    lead_id: data.id,
-    timezone: data.timezone,
-    intentos_programados: count ?? 0,
-    llamada_inmediata: llamadaInmediata,
-  });
+  return {
+    code: 201,
+    body: {
+      lead_id: data.id,
+      timezone: data.timezone,
+      intentos_programados: count ?? 0,
+      llamada_inmediata: llamadaInmediata,
+    },
+  };
 }

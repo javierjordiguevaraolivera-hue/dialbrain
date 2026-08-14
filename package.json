@@ -1,18 +1,23 @@
 {
   "name": "dialbrain",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Cerebro del predictive dialer: cadencia de leads en Supabase + despacho a Dapta",
-  "type": "module",
+  "description": "Cerebro del predictive dialer: cadencia de leads en Supabase + despacho a Dapta + panel",
   "scripts": {
+    "dev": "next dev -p 3040",
+    "build": "next build",
+    "start": "next start",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.0"
+    "@supabase/supabase-js": "^2.45.0",
+    "next": "^14.2.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
-    "@vercel/node": "^3.2.0",
+    "@types/react": "^18.3.3",
     "typescript": "^5.5.0"
   }
 }

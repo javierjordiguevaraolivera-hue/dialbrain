@@ -1,10 +1,10 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabase } from '../lib/supabase.js';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { supabase } from '../../lib/supabase';
 
 // Interruptor maestro del marcado.
 //   GET  /api/switch          -> estado actual
 //   POST /api/switch {"marcando": false} -> apagar (true -> prender)
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.headers['x-api-key'] !== process.env.LEADS_API_KEY) {
     return res.status(401).json({ error: 'unauthorized' });
   }

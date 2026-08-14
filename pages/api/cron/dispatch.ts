@@ -1,10 +1,10 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabase } from '../../lib/supabase.js';
-import { dispararLlamada, marcarFallo, type FilaDespacho } from '../../lib/dapta.js';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { supabase } from '../../../lib/supabase';
+import { dispararLlamada, marcarFallo, type FilaDespacho } from '../../../lib/dapta';
 
 // Tick del despachador. Lo dispara el cron de Vercel (o pg_cron) cada minuto.
 // Toma los intentos vencidos vía RPC y dispara todos los webhooks a Dapta en paralelo.
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'unauthorized' });
   }

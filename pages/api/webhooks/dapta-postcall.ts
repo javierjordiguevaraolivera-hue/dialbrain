@@ -1,5 +1,5 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabase } from '../../lib/supabase.js';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { supabase } from '../../../lib/supabase';
 
 function parseMaybeJson(v: unknown): Record<string, any> {
   if (v && typeof v === 'object') return v as Record<string, any>;
@@ -11,7 +11,7 @@ function parseMaybeJson(v: unknown): Record<string, any> {
 
 // Post-call webhook de Dapta: llega el resultado de cada llamada con las
 // dynamic_variables (lead_id / intento_id) y el call_analysis.
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' });
   if (process.env.WEBHOOK_TOKEN && req.query.token !== process.env.WEBHOOK_TOKEN) {
     return res.status(401).json({ error: 'unauthorized' });
