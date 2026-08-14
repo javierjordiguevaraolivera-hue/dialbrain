@@ -51,6 +51,13 @@ export default function Panel() {
   const [form, setForm] = useState(FORM_VACIO);
   const [enviando, setEnviando] = useState(false);
   const [aviso, setAviso] = useState<{ ok: boolean; texto: string } | null>(null);
+  const [confirmacion, setConfirmacion] = useState<{
+    titulo: string;
+    texto: string;
+    boton: string;
+    peligro?: boolean;
+    onOk: () => void;
+  } | null>(null);
 
   const cargar = useCallback(async () => {
     try {
@@ -81,12 +88,6 @@ export default function Panel() {
     });
 
   async function accionLead(lead: Lead, accion: 'pausar' | 'reactivar' | 'dnc') {
-    if (accion === 'dnc') {
-      const ok = window.confirm(
-        `¿NO llamar NUNCA MÁS a ${lead.nombre || lead.telefono}? Esto es definitivo (la data se conserva, pero no hay vuelta atrás).`
-      );
-      if (!ok) return;
-    }
     const r = await fetch('/api/panel-lead-accion', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -163,18 +164,24 @@ export default function Panel() {
           className={`switch-chip clickeable ${marcando === false ? 'off' : ''}`}
           title="Switch maestro: prende/apaga TODO el marcado del sistema"
           disabled={marcando === null}
-          onClick={async () => {
+          onClick={() => {
             const nuevo = !(marcando === true);
-            const msg = nuevo
-              ? '¿Prender el marcado? El sistema volverá a llamar (los intentos atrasados salen al ritmo normal).'
-              : '¿Apagar TODO el marcado? Nadie recibirá llamadas hasta que lo prendas de nuevo.';
-            if (!window.confirm(msg)) return;
-            await fetch('/api/panel-switch', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ marcando: nuevo }),
+            setConfirmacion({
+              titulo: nuevo ? 'Prender el marcado' : 'Apagar el marcado',
+              texto: nuevo
+                ? 'El sistema volverá a llamar. Los intentos atrasados salen al ritmo normal, sin estampida.'
+                : 'Se pausa TODO el sistema: nadie recibirá llamadas hasta que lo prendas de nuevo.',
+              boton: nuevo ? 'Prender' : 'Apagar',
+              peligro: !nuevo,
+              onOk: async () => {
+                await fetch('/api/panel-switch', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ marcando: nuevo }),
+                });
+                cargar();
+              },
             });
-            cargar();
           }}
         >
           <span
@@ -235,14 +242,14 @@ export default function Panel() {
           <thead>
             <tr>
               <th></th><th>Lead</th><th>Teléfono</th><th>Estado</th><th>Status</th>
-              <th>Fuente</th><th>Entró</th><th>Intentos</th>
+              <th>Fuente</th><th>Entró</th><th>Intentos</th><th>Acciones</th>
             </tr>
           </thead>
           <tbody>
             {errorCarga ? (
-              <tr><td colSpan={8} className="vacio">Error cargando datos: {errorCarga}</td></tr>
+              <tr><td colSpan={9} className="vacio">Error cargando datos: {errorCarga}</td></tr>
             ) : !filtrados.length ? (
-              <tr><td colSpan={8} className="vacio">Sin leads todavía. Usa “Agregar lead” o manda un POST a /api/leads.</td></tr>
+              <tr><td colSpan={9} className="vacio">Sin leads todavía. Usa “Agregar lead” o manda un POST a /api/leads.</td></tr>
             ) : (
               filtrados.map((l) => {
                 const ints = l.intentos ?? [];
@@ -262,26 +269,48 @@ export default function Panel() {
                       <td className="muted">{l.fuente ?? '—'}</td>
                       <td className="muted">{fmt(l.created_at)}</td>
                       <td className="muted">{hechos}/{ints.length}</td>
+                      <td className="celda-acciones" onClick={(e) => e.stopPropagation()}>
+                        {l.status !== 'dnc' && (
+                          <div className="acciones-lead">
+                            {l.pausado ? (
+                              <button
+                                className="btn mini"
+                                title="Reactivar: continúa con sus intentos futuros (los vencidos durante la pausa se pierden)"
+                                onClick={() => accionLead(l, 'reactivar')}
+                              >
+                                ▶ Reactivar
+                              </button>
+                            ) : (
+                              <button
+                                className="btn mini ghost"
+                                title="Pausar: no se le llama hasta que lo reactives"
+                                onClick={() => accionLead(l, 'pausar')}
+                              >
+                                ⏸ Pausar
+                              </button>
+                            )}
+                            <button
+                              className="btn mini peligro"
+                              title="No llamar más (definitivo, la data se conserva)"
+                              onClick={() =>
+                                setConfirmacion({
+                                  titulo: 'No llamar más',
+                                  texto: `¿NO llamar NUNCA MÁS a ${l.nombre || l.telefono}? Es definitivo: la data se conserva, pero no hay vuelta atrás.`,
+                                  boton: 'No llamar más',
+                                  peligro: true,
+                                  onOk: () => accionLead(l, 'dnc'),
+                                })
+                              }
+                            >
+                              🚫
+                            </button>
+                          </div>
+                        )}
+                      </td>
                     </tr>
                     {abierto && (
                       <tr className="sub">
-                        <td colSpan={8}>
-                          {l.status !== 'dnc' && (
-                            <div className="acciones-lead">
-                              {l.pausado ? (
-                                <button className="btn mini" onClick={(e) => { e.stopPropagation(); accionLead(l, 'reactivar'); }}>
-                                  ▶ Reactivar
-                                </button>
-                              ) : (
-                                <button className="btn mini ghost" onClick={(e) => { e.stopPropagation(); accionLead(l, 'pausar'); }}>
-                                  ⏸ Pausar
-                                </button>
-                              )}
-                              <button className="btn mini peligro" onClick={(e) => { e.stopPropagation(); accionLead(l, 'dnc'); }}>
-                                🚫 No llamar más
-                              </button>
-                            </div>
-                          )}
+                        <td colSpan={9}>
                           <table className="intentos">
                             <thead>
                               <tr>
@@ -370,6 +399,28 @@ export default function Panel() {
         </div>
       )}
 
+      {confirmacion && (
+        <div className="overlay" onClick={() => setConfirmacion(null)}>
+          <div className="modal chica" onClick={(e) => e.stopPropagation()}>
+            <h2>{confirmacion.titulo}</h2>
+            <p className="muted nota">{confirmacion.texto}</p>
+            <div className="acciones">
+              <button className="btn ghost" onClick={() => setConfirmacion(null)}>Cancelar</button>
+              <button
+                className={`btn ${confirmacion.peligro ? 'peligro' : ''}`}
+                onClick={() => {
+                  const fn = confirmacion.onOk;
+                  setConfirmacion(null);
+                  fn();
+                }}
+              >
+                {confirmacion.boton}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style jsx global>{`
         :root {
           --bg: #0b1220; --panel: #111a2e; --border: #1e2a44; --text: #e6ecf7;
@@ -415,9 +466,13 @@ export default function Panel() {
         .switch-chip.clickeable { cursor: pointer; }
         .switch-chip.clickeable:hover { border-color: var(--accent); }
         .switch-chip.off { border-color: #7f2a2a; }
-        .acciones-lead { display: flex; gap: 8px; margin: 4px 0 10px; }
-        .btn.mini { padding: 5px 12px; font-size: 12px; }
+        .acciones-lead { display: flex; gap: 6px; }
+        .celda-acciones { cursor: default; }
+        .btn.mini { padding: 4px 10px; font-size: 12px; white-space: nowrap; }
         .btn.peligro { background: #7f2a2a; }
+        .modal.chica { max-width: 380px; }
+        .modal.chica h2 { margin-bottom: 8px; }
+        .modal.chica .nota { margin-bottom: 20px; font-size: 13px; }
         tr.sub td { background: #0d1626; padding: 8px 14px 16px; }
         table.intentos { width: 100%; border-collapse: collapse; }
         table.intentos th { padding: 6px 10px; font-size: 10px; border-bottom: 1px solid var(--border); }
