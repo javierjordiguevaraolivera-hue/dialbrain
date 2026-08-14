@@ -18,6 +18,7 @@ type Lead = {
   estado_us: string | null;
   timezone: string | null;
   status: string;
+  pausado: boolean;
   fuente: string | null;
   created_at: string;
   intentos: Intento[];
@@ -54,6 +55,7 @@ export default function Panel() {
   const cargar = useCallback(async () => {
     try {
       const r = await fetch('/api/panel-data', { cache: 'no-store' });
+      if (r.status === 401) { window.location.href = '/login'; return; }
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const d = await r.json();
       setMarcando(d.marcando);
@@ -77,6 +79,34 @@ export default function Panel() {
       s.has(id) ? s.delete(id) : s.add(id);
       return s;
     });
+
+  async function accionLead(lead: Lead, accion: 'pausar' | 'reactivar' | 'dnc') {
+    if (accion === 'dnc') {
+      const ok = window.confirm(
+        `¿NO llamar NUNCA MÁS a ${lead.nombre || lead.telefono}? Esto es definitivo (la data se conserva, pero no hay vuelta atrás).`
+      );
+      if (!ok) return;
+    }
+    const r = await fetch('/api/panel-lead-accion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lead_id: lead.id, accion }),
+    });
+    const d = await r.json();
+    if (!r.ok || d.ok === false) {
+      setAviso({ ok: false, texto: d.error ?? `HTTP ${r.status}` });
+    } else if (accion === 'reactivar') {
+      setAviso({
+        ok: true,
+        texto: d.nota
+          ? `Reactivado, pero ${d.nota}`
+          : `Lead reactivado${d.intentos_perdidos ? ` (${d.intentos_perdidos} intento(s) vencidos durante la pausa se perdieron)` : ''} — continúa con sus intentos futuros`,
+      });
+    } else {
+      setAviso({ ok: true, texto: accion === 'pausar' ? 'Lead pausado — no se le llamará hasta reactivarlo' : 'Lead marcado como NO LLAMAR (DNC)' });
+    }
+    cargar();
+  }
 
   async function crearLead(e: React.FormEvent) {
     e.preventDefault();
@@ -129,17 +159,44 @@ export default function Panel() {
 
       <header>
         <h1>📞 DialBrain</h1>
-        <span className="switch-chip">
+        <button
+          className={`switch-chip clickeable ${marcando === false ? 'off' : ''}`}
+          title="Switch maestro: prende/apaga TODO el marcado del sistema"
+          disabled={marcando === null}
+          onClick={async () => {
+            const nuevo = !(marcando === true);
+            const msg = nuevo
+              ? '¿Prender el marcado? El sistema volverá a llamar (los intentos atrasados salen al ritmo normal).'
+              : '¿Apagar TODO el marcado? Nadie recibirá llamadas hasta que lo prendas de nuevo.';
+            if (!window.confirm(msg)) return;
+            await fetch('/api/panel-switch', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ marcando: nuevo }),
+            });
+            cargar();
+          }}
+        >
           <span
             className="dot"
             style={{ background: marcando === true ? '#4ade80' : marcando === false ? '#f87171' : '#666' }}
           />
           {marcando === true ? 'Marcado ON' : marcando === false ? 'Marcado OFF' : 'sin config'}
-        </span>
+        </button>
         <span className="spacer" />
         <span className="meta">{updated && `Actualizado ${updated}`}</span>
         <button className="btn ghost" onClick={cargar}>Actualizar</button>
         <button className="btn" onClick={() => { setAviso(null); setModal(true); }}>+ Agregar lead</button>
+        <button
+          className="btn ghost"
+          title="Cerrar sesión"
+          onClick={async () => {
+            await fetch('/api/logout', { method: 'POST' });
+            window.location.href = '/login';
+          }}
+        >
+          Salir
+        </button>
       </header>
 
       {aviso && (
@@ -198,7 +255,10 @@ export default function Panel() {
                       <td>{l.nombre || 'Sin nombre'}</td>
                       <td className="tel">{l.telefono}</td>
                       <td className="muted">{l.estado_us ?? '—'}</td>
-                      <td><Chip s={l.status} /></td>
+                      <td>
+                        <Chip s={l.status} />
+                        {l.pausado && <span className="chip st-pausado">⏸ pausado</span>}
+                      </td>
                       <td className="muted">{l.fuente ?? '—'}</td>
                       <td className="muted">{fmt(l.created_at)}</td>
                       <td className="muted">{hechos}/{ints.length}</td>
@@ -206,6 +266,22 @@ export default function Panel() {
                     {abierto && (
                       <tr className="sub">
                         <td colSpan={8}>
+                          {l.status !== 'dnc' && (
+                            <div className="acciones-lead">
+                              {l.pausado ? (
+                                <button className="btn mini" onClick={(e) => { e.stopPropagation(); accionLead(l, 'reactivar'); }}>
+                                  ▶ Reactivar
+                                </button>
+                              ) : (
+                                <button className="btn mini ghost" onClick={(e) => { e.stopPropagation(); accionLead(l, 'pausar'); }}>
+                                  ⏸ Pausar
+                                </button>
+                              )}
+                              <button className="btn mini peligro" onClick={(e) => { e.stopPropagation(); accionLead(l, 'dnc'); }}>
+                                🚫 No llamar más
+                              </button>
+                            </div>
+                          )}
                           <table className="intentos">
                             <thead>
                               <tr>
@@ -335,6 +411,13 @@ export default function Panel() {
         .st-buzon       { background: #33224d; color: #b79df0; }
         .st-no_contesto { background: #2a3245; color: #9aa8c4; }
         .st-cancelado   { background: #202737; color: #6b7896; text-decoration: line-through; }
+        .st-pausado     { background: #3d3208; color: #fbbf24; margin-left: 6px; }
+        .switch-chip.clickeable { cursor: pointer; }
+        .switch-chip.clickeable:hover { border-color: var(--accent); }
+        .switch-chip.off { border-color: #7f2a2a; }
+        .acciones-lead { display: flex; gap: 8px; margin: 4px 0 10px; }
+        .btn.mini { padding: 5px 12px; font-size: 12px; }
+        .btn.peligro { background: #7f2a2a; }
         tr.sub td { background: #0d1626; padding: 8px 14px 16px; }
         table.intentos { width: 100%; border-collapse: collapse; }
         table.intentos th { padding: 6px 10px; font-size: 10px; border-bottom: 1px solid var(--border); }

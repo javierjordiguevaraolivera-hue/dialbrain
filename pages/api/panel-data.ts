@@ -11,7 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     supabase
       .from('leads')
       .select(
-        'id, nombre, telefono, estado_us, timezone, status, fuente, created_at, ' +
+        'id, nombre, telefono, estado_us, timezone, status, pausado, fuente, created_at, ' +
         'intentos ( numero_intento, status, programado_para, enviado_at, resultado_at, from_number, dapta_call_id )'
       )
       .order('created_at', { ascending: false })

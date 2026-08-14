@@ -1,27 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { COOKIE_SESION, tokenSesion } from './lib/session';
 
-// Basic Auth para el panel y sus endpoints (PANEL_EMAIL / PANEL_PASSWORD).
+// Protege el panel y sus endpoints con la cookie de sesión (login en /login).
 export const config = {
-  matcher: ['/panel', '/api/panel-data', '/api/panel-lead'],
+  matcher: ['/panel', '/api/panel-data', '/api/panel-lead', '/api/panel-lead-accion', '/api/panel-switch'],
 };
 
-export function middleware(req: NextRequest) {
-  const h = req.headers.get('authorization') ?? '';
-  if (h.startsWith('Basic ')) {
-    const decoded = atob(h.slice(6));
-    const sep = decoded.indexOf(':');
-    const email = decoded.slice(0, sep);
-    const pass = decoded.slice(sep + 1);
-    if (
-      email === process.env.PANEL_EMAIL &&
-      pass === process.env.PANEL_PASSWORD &&
-      process.env.PANEL_PASSWORD
-    ) {
-      return NextResponse.next();
-    }
+export async function middleware(req: NextRequest) {
+  const cookie = req.cookies.get(COOKIE_SESION)?.value;
+  if (cookie && process.env.PANEL_PASSWORD && cookie === (await tokenSesion())) {
+    return NextResponse.next();
   }
-  return new NextResponse('Autenticación requerida', {
-    status: 401,
-    headers: { 'WWW-Authenticate': 'Basic realm="DialBrain"' },
-  });
+  if (req.nextUrl.pathname.startsWith('/api/')) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
+  const url = req.nextUrl.clone();
+  url.pathname = '/login';
+  url.search = '';
+  return NextResponse.redirect(url);
 }
