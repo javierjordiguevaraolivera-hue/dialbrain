@@ -36,10 +36,18 @@ const Chip = ({ s }: { s: string }) => (
   <span className={`chip st-${s}`}>{s.replaceAll('_', ' ')}</span>
 );
 
-const FORM_VACIO = { nombre: '', telefono: '', estado: '', fuente: '' };
+const FORM_VACIO = { nombre: '', telefono: '', estado: '', fuente: '', desde: '' };
+
+type Numero = {
+  telefono: string;
+  estado_us: string | null;
+  activo: boolean;
+  en_spam: boolean;
+};
 
 export default function Panel() {
   const [marcando, setMarcando] = useState<boolean | null>(null);
+  const [numeros, setNumeros] = useState<Numero[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [errorCarga, setErrorCarga] = useState('');
   const [updated, setUpdated] = useState('');
@@ -66,6 +74,7 @@ export default function Panel() {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const d = await r.json();
       setMarcando(d.marcando);
+      setNumeros(d.numeros ?? []);
       setLeads(d.leads ?? []);
       setErrorCarga('');
       setUpdated(new Date().toLocaleTimeString('es-PE'));
@@ -385,6 +394,19 @@ export default function Panel() {
                   />
                 </label>
               </div>
+              <label>
+                Llamar desde
+                <select value={form.desde} onChange={(e) => setForm({ ...form, desde: e.target.value })}>
+                  <option value="">Automático (rotación local presence)</option>
+                  {numeros
+                    .filter((n) => n.activo && !n.en_spam)
+                    .map((n) => (
+                      <option key={n.telefono} value={n.telefono}>
+                        {n.telefono}{n.estado_us ? ` — ${n.estado_us}` : ''}
+                      </option>
+                    ))}
+                </select>
+              </label>
               {aviso && !aviso.ok && <div className="aviso err chico">{aviso.texto}</div>}
               <div className="acciones">
                 <button type="button" className="btn ghost" disabled={enviando} onClick={() => setModal(false)}>
@@ -486,7 +508,7 @@ export default function Panel() {
         .modal h2 { font-size: 17px; margin-bottom: 4px; }
         .modal .nota { font-size: 12px; margin-bottom: 16px; }
         .modal label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 12px; }
-        .modal input { display: block; width: 100%; margin-top: 4px; }
+        .modal input, .modal select { display: block; width: 100%; margin-top: 4px; }
         .modal .fila { display: flex; gap: 10px; }
         .modal .fila label { flex: 1; }
         .acciones { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }

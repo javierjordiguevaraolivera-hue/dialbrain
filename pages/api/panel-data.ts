@@ -6,8 +6,12 @@ import { supabase } from '../../lib/supabase';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const limit = Math.min(parseInt(String(req.query.limit ?? '200'), 10) || 200, 500);
 
-  const [{ data: cfg }, { data: leads, error }] = await Promise.all([
+  const [{ data: cfg }, { data: numeros }, { data: leads, error }] = await Promise.all([
     supabase.from('config').select('marcando').eq('id', 1).single(),
+    supabase
+      .from('numeros_salida')
+      .select('telefono, estado_us, activo, en_spam')
+      .order('estado_us', { ascending: true }),
     supabase
       .from('leads')
       .select(
@@ -22,5 +26,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (error) return res.status(500).json({ error: error.message });
 
   res.setHeader('Cache-Control', 'no-store');
-  return res.status(200).json({ marcando: cfg?.marcando ?? null, leads: leads ?? [] });
+  return res.status(200).json({
+    marcando: cfg?.marcando ?? null,
+    numeros: numeros ?? [],
+    leads: leads ?? [],
+  });
 }

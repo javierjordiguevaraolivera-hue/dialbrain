@@ -33,6 +33,12 @@ export async function crearLead(input: Record<string, any>): Promise<ResultadoCr
     return { code: 400, body: { error: 'telefono inválido (se espera US de 10 dígitos o celular peruano de 9)' } };
   }
 
+  // opcional: forzar el número de salida (si no, rotación automática)
+  let numeroPreferido: string | null = null;
+  const desdeDigits = String(b.desde ?? b.from_number ?? b.numero_preferido ?? '').replace(/\D/g, '');
+  if (desdeDigits.length === 10) numeroPreferido = `+1${desdeDigits}`;
+  else if (desdeDigits.length === 11 && desdeDigits.startsWith('1')) numeroPreferido = `+${desdeDigits}`;
+
   const { data, error } = await supabase
     .from('leads')
     .insert({
@@ -41,6 +47,7 @@ export async function crearLead(input: Record<string, any>): Promise<ResultadoCr
       estado_us: b.estado ?? b.estado_us ?? b.state ?? null,
       timezone, // null para US: el trigger la deriva del estado
       fuente: b.fuente ?? b.source ?? null,
+      numero_preferido: numeroPreferido,
     })
     .select('id, timezone, status')
     .single();
