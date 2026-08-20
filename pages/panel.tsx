@@ -395,7 +395,7 @@ export default function Panel() {
                 </label>
               </div>
               <label>
-                Llamar desde
+                Llamar desde (solo la 1ª llamada — después rota solo)
                 <select value={form.desde} onChange={(e) => setForm({ ...form, desde: e.target.value })}>
                   <option value="">Automático (rotación local presence)</option>
                   {numeros

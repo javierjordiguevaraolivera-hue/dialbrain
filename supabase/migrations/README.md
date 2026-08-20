@@ -17,3 +17,4 @@ Registro de qué SQL ya se ejecutó en Supabase (SQL Editor) y cuál falta.
 | 006 | `006_switch_marcado.sql` | Tabla `config` con el switch maestro `marcando`; el despachador no marca nada cuando está apagado | ✅ ejecutado |
 | 007 | `007_pausa_por_lead.sql` | Columna `leads.pausado` + RPC `pausar_lead(lead_id, accion)` (pausar / reactivar / dnc); el despachador salta pausados | ✅ ejecutado |
 | 008 | `008_numero_preferido.sql` | Columna `leads.numero_preferido` (opcional): forzar desde qué número se llama a un lead; si no está disponible cae a la rotación normal | ✅ ejecutado |
+| 009 | `009_rotacion_por_lead.sql` | Fix rotación: nunca repetir número con el mismo lead — primero los no usados con ese lead (local presence de desempate), luego el menos reciente; el preferido solo fuerza el intento 1 | ✅ ejecutado |
